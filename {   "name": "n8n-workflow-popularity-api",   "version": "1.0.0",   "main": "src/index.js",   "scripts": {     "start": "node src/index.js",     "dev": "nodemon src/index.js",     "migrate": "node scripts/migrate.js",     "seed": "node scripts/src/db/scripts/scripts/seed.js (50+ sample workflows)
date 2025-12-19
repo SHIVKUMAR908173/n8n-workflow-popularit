@@ -1,0 +1,38 @@
+import { db, initDb } from "../src/db/index.js";
+import seedData from "../data/seed-workflows.json" assert { type: "json" };
+
+initDb();
+
+const stmt = db.prepare(
+  `INSERT INTO workflows(
+    workflow, platform, country,
+    views, likes, comments,
+    like_to_view_ratio, comment_to_view_ratio,
+    replies, contributors,
+    search_volume, trend_change_60d,
+    source_id, last_seen_at
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+);
+
+for (const w of seedData) {
+  stmt.run(
+    w.workflow,
+    w.platform,
+    w.country,
+    w.views ?? null,
+    w.likes ?? null,
+    w.comments ?? null,
+    w.like_to_view_ratio ?? null,
+    w.comment_to_view_ratio ?? null,
+    w.replies ?? null,
+    w.contributors ?? null,
+    w.search_volume ?? null,
+    w.trend_change_60d ?? null,
+    w.source_id ?? null,
+    new Date().toISOString()
+  );
+}
+
+stmt.finalize();
+db.close();
+console.log("Seed complete");

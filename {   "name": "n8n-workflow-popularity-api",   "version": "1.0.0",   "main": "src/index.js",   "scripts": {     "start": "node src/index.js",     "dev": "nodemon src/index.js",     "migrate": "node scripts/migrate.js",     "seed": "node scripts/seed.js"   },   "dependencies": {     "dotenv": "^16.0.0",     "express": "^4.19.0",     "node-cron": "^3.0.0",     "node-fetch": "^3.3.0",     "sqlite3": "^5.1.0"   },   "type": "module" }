@@ -1,0 +1,34 @@
+import "dotenv/config";
+import express from "express";
+import cron from "node-cron";
+import workflowsRouter from "./routes/workflows.route.js";
+import adminRouter from "./routes/admin.route.js";
+import { runAllCollectors } from "./collectors/index.js";
+
+const app = express();
+app.use(express.json());
+
+// Routes
+app.use("/workflows", workflowsRouter);
+app.use("/admin", adminRouter);
+
+// Health
+app.get("/", (req, res) => {
+  res.json({ ok: true, message: "n8n popularity API" });
+});
+
+// Cron: run collectors every day at 03:00
+cron.schedule("0 3 * * *", async () => {
+  console.log("[CRON] Running daily collectors");
+  try {
+    await runAllCollectors();
+    console.log("[CRON] Collectors finished");
+  } catch (err) {
+    console.error("[CRON] Error:", err);
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`API listening on port ${PORT}`);
+});

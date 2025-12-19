@@ -1,0 +1,30 @@
+import sqlite3 from "sqlite3";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const dbPath = path.join(__dirname, "../../data/workflows.db");
+
+export const db = new sqlite3.Database(dbPath);
+
+export function initDb() {
+  db.run(
+    `CREATE TABLE IF NOT EXISTS workflows (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      workflow TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      country TEXT NOT NULL,
+      views INTEGER,
+      likes INTEGER,
+      comments INTEGER,
+      like_to_view_ratio REAL,
+      comment_to_view_ratio REAL,
+      replies INTEGER,
+      contributors INTEGER,
+      search_volume INTEGER,
+      trend_change_60d REAL,
+      source_id TEXT,
+      last_seen_at TEXT
+    )`
+  );
+}

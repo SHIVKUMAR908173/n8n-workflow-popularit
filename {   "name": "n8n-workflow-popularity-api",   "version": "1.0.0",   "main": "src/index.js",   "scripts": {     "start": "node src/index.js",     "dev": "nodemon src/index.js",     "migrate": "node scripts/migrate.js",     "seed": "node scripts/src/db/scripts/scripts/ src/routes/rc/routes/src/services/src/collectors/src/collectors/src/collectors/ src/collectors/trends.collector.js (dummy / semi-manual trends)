@@ -1,0 +1,29 @@
+import { db } from "../db/index.js";
+import trendsData from "../../data/trends-workflows.json" assert { type: "json" };
+
+export async function runTrendsCollector() {
+  const stmt = db.prepare(
+    `INSERT INTO workflows(
+      workflow, platform, country,
+      search_volume, trend_change_60d,
+      source_id, last_seen_at
+    ) VALUES (?,?,?,?,?,?,?)`
+  );
+
+  for (const t of trendsData) {
+    await new Promise((resolve, reject) => {
+      stmt.run(
+        t.workflow,
+        "Google",
+        t.country,
+        t.search_volume,
+        t.trend_change_60d,
+        t.source_id || null,
+        new Date().toISOString(),
+        (err) => (err ? reject(err) : resolve())
+      );
+    });
+  }
+
+  stmt.finalize();
+}

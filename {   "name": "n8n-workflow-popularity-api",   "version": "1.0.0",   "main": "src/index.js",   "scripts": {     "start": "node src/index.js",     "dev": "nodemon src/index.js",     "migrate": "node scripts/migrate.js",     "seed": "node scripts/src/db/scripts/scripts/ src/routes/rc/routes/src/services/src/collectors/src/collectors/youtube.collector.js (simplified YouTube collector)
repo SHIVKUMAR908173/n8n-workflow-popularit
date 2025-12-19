@@ -1,0 +1,87 @@
+import fetch from "node-fetch";
+import { db } from "../db/index.js";
+
+const API_KEY = process.env.YOUTUBE_API_KEY;
+
+// Helper to upsert
+function upsertWorkflow(row) {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      INSERT INTO workflows (
+        workflow, platform, country,
+        views, likes, comments,
+        like_to_view_ratio, comment_to_view_ratio,
+        source_id, last_seen_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?)
+    `;
+    db.run(
+      sql,
+      [
+        row.workflow,
+        "YouTube",
+        row.country,
+        row.views,
+        row.likes,
+        row.comments,
+        row.like_to_view_ratio,
+        row.comment_to_view_ratio,
+        row.source_id,
+        new Date().toISOString()
+      ],
+      (err) => (err ? reject(err) : resolve())
+    );
+  });
+}
+
+export async function runYouTubeCollector() {
+  const queries = ["n8n workflow", "n8n automation", "n8n Gmail", "n8n Slack integration"];
+  const countries = ["US", "IN"];
+
+  for (const country of countries) {
+    for (const q of queries) {
+      const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+      searchUrl.searchParams.set("part", "snippet");
+      searchUrl.searchParams.set("q", q);
+      searchUrl.searchParams.set("type", "video");
+      searchUrl.searchParams.set("maxResults", "10");
+      searchUrl.searchParams.set("key", API_KEY);
+      searchUrl.searchParams.set("regionCode", country);
+
+      const searchRes = await fetch(searchUrl.toString());
+      const searchJson = await searchRes.json();
+
+      const ids = (searchJson.items || []).map((i) => i.id.videoId).join(",");
+      if (!ids) continue;
+
+      const statsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+      statsUrl.searchParams.set("part", "snippet,statistics");
+      statsUrl.searchParams.set("id", ids);
+      statsUrl.searchParams.set("key", API_KEY);
+
+      const statsRes = await fetch(statsUrl.toString());
+      const statsJson = await statsRes.json();
+
+      for (const item of statsJson.items || []) {
+        const title = item.snippet.title;
+        const stats = item.statistics || {};
+        const views = Number(stats.viewCount || 0);
+        const likes = Number(stats.likeCount || 0);
+        const comments = Number(stats.commentCount || 0);
+        const likeRatio = views > 0 ? likes / views : 0;
+        const commentRatio = views > 0 ? comments / views : 0;
+
+        const row = {
+          workflow: title,
+          country,
+          views,
+          likes,
+          comments,
+          like_to_view_ratio: likeRatio,
+          comment_to_view_ratio: commentRatio,
+          source_id: item.id
+        };
+        await upsertWorkflow(row);
+      }
+    }
+  }
+}

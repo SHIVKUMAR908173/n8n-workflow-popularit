@@ -1,0 +1,9 @@
+import { runYouTubeCollector } from "./youtube.collector.js";
+import { runForumCollector } from "./forum.collector.js";
+import { runTrendsCollector } from "./trends.collector.js";
+
+export async function runAllCollectors() {
+  await runYouTubeCollector();
+  await runForumCollector();
+  await runTrendsCollector();
+}

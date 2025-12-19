@@ -1,0 +1,62 @@
+import fetch from "node-fetch";
+import { db } from "../db/index.js";
+
+const DISCOURSE_BASE_URL = process.env.DISCOURSE_BASE_URL || "https://community.n8n.io";
+const DISCOURSE_API_KEY = process.env.DISCOURSE_API_KEY;
+const DISCOURSE_API_USERNAME = process.env.DISCOURSE_API_USERNAME;
+
+function upsertForumWorkflow(row) {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      INSERT INTO workflows (
+        workflow, platform, country,
+        views, likes, replies,
+        contributors, source_id, last_seen_at
+      ) VALUES (?,?,?,?,?,?,?,?,?)
+    `;
+    db.run(
+      sql,
+      [
+        row.workflow,
+        "Forum",
+        row.country,
+        row.views,
+        row.likes,
+        row.replies,
+        row.contributors,
+        row.source_id,
+        new Date().toISOString()
+      ],
+      (err) => (err ? reject(err) : resolve())
+    );
+  });
+}
+
+export async function runForumCollector() {
+  const url = `${DISCOURSE_BASE_URL}/latest.json`;
+  const res = await fetch(url, {
+    headers: {
+      "Api-Key": DISCOURSE_API_KEY,
+      "Api-Username": DISCOURSE_API_USERNAME
+    }
+  });
+  const json = await res.json();
+
+  for (const topic of json.topic_list.topics || []) {
+    const title = topic.title;
+    // Simple heuristic: mention "India" → IN else US
+    const country = /india/i.test(title) ? "IN" : "US";
+
+    const row = {
+      workflow: title,
+      country,
+      views: topic.views || 0,
+      likes: topic.like_count || 0,
+      replies: (topic.posts_count || 1) - 1,
+      contributors: topic.participants_count || 1,
+      source_id: topic.id
+    };
+
+    await upsertForumWorkflow(row);
+  }
+}
